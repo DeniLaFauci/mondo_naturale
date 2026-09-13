@@ -2,9 +2,10 @@ extends Node3D
 
 func _ready() -> void:
 	crea_illuminazione()
+	crea_mare()
 	crea_terreno_collinare()
 	crea_telecamera()
-	print("Mondo collinare generato con successo!")
+	print("Mondo con mare e atmosfera generato con successo!")
 
 func crea_illuminazione() -> void:
 	# 1. Crea la luce del Sole
@@ -12,21 +13,50 @@ func crea_illuminazione() -> void:
 	sole.name = "Sole"
 	sole.shadow_bias = 0.05
 	sole.shadow_enabled = true
-	sole.rotation_degrees = Vector3(-35, 45, 0)
+	sole.light_color = Color(1.0, 0.92, 0.82)
+	sole.light_energy = 1.2
+	sole.rotation_degrees = Vector3(-22, 55, 0)
 	add_child(sole)
 
 	# 2. Crea il cielo e l'ambiente
-	var env = Environment.new()
 	var cielo_mat = ProceduralSkyMaterial.new()
+	cielo_mat.sky_top_color = Color(0.28, 0.52, 0.88)
+	cielo_mat.sky_horizon_color = Color(0.72, 0.82, 0.90)
+	cielo_mat.ground_bottom_color = Color(0.15, 0.35, 0.45)
+	cielo_mat.ground_horizon_color = Color(0.72, 0.82, 0.90)
+	cielo_mat.sun_angle_max = 15.0
+
 	var cielo = Sky.new()
 	cielo.sky_material = cielo_mat
+
+	var env = Environment.new()
 	env.sky = cielo
 	env.background_mode = Environment.BG_SKY
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.70, 0.80, 0.88)
+	env.fog_density = 0.003
+	env.fog_aerial_perspective = 0.6
+
 	var world_env = WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
+
+func crea_mare() -> void:
+	var mesh_mare = MeshInstance3D.new()
+	var piano_mare = PlaneMesh.new()
+	piano_mare.size = Vector2(2000.0, 2000.0)
+	mesh_mare.mesh = piano_mare
+	mesh_mare.position.y = 0.5
+
+	var mat_mare = StandardMaterial3D.new()
+	mat_mare.albedo_color = Color(0.06, 0.18, 0.28)
+	mat_mare.roughness = 0.15
+	mat_mare.metallic = 0.1
+	mesh_mare.material_override = mat_mare
+
+	add_child(mesh_mare)
 
 func crea_terreno_collinare() -> void:
 	# 1. Configurazione rumore frattale (Fractional Brownian Motion)
@@ -70,7 +100,9 @@ func crea_terreno_collinare() -> void:
 	add_child(mesh_istanza)
 
 func crea_telecamera() -> void:
+	var script_volo = load("res://telecamera_volo.gd")
 	var cam = Camera3D.new()
-	cam.position = Vector3(0, 15, 35)
-	cam.rotation_degrees = Vector3(-20, 0, 0)
+	cam.set_script(script_volo)
+	cam.current = true
+	cam.position = Vector3(0, 22, 45)
 	add_child(cam)
