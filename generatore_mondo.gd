@@ -62,9 +62,8 @@ func crea_terreno_collinare() -> void:
 	var mesh_istanza = MeshInstance3D.new()
 	mesh_istanza.mesh = st.commit()
 
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.45, 0.18)
-	mat.roughness = 0.85
+	var mat = ShaderMaterial.new()
+	mat.shader = load("res://terreno_shader.gdshader")
 	mesh_istanza.material_override = mat
 
 	add_child(mesh_istanza)
