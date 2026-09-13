@@ -10,6 +10,7 @@ func crea_illuminazione() -> void:
 	# 1. Crea la luce del Sole
 	var sole = DirectionalLight3D.new()
 	sole.name = "Sole"
+	sole.shadow_bias = 0.05
 	sole.shadow_enabled = true
 	sole.rotation_degrees = Vector3(-35, 45, 0)
 	add_child(sole)
@@ -37,16 +38,16 @@ func crea_terreno_collinare() -> void:
 
 	# Usiamo PlaneMesh nativo che ha già la topologia e le normali perfette
 	var piano = PlaneMesh.new()
-	piano.size = Vector2(140, 140)
-	piano.subdivide_width = 80
-	piano.subdivide_depth = 80
+	piano.size = Vector2(160, 160)
+	piano.subdivide_width = 100
+	piano.subdivide_depth = 100
 
 	# Convertiamo in ArrayMesh per deformare la quota Y di ogni singolo vertice
 	var array_mesh = ArrayMesh.new()
 	var array = piano.get_mesh_arrays()
 	var vertici = array[Mesh.ARRAY_VERTEX]
 
-	var altezza_massima = 12.0
+	var altezza_massima = 28.0
 	for i in range(vertici.size()):
 		var v = vertici[i]
 		v.y = rumore.get_noise_2d(v.x, v.z) * altezza_massima
