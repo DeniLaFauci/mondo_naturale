@@ -1,14 +1,16 @@
 extends Camera3D
 
-@export var velocita_base: float = 25.0
-@export var velocita_rotazione: float = 2.0
+@export var velocita_base: float = 35.0
+@export var velocita_rotazione: float = 2.5
 
-var rot_x: float = 0.0
+var rot_x: float = -0.3
 var rot_y: float = 0.0
 
 func _ready() -> void:
+	current = true
 	rot_x = rotation.x
 	rot_y = rotation.y
+	print("Telecamera inizializzata e attiva!")
 
 func _process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_LEFT):
@@ -20,27 +22,27 @@ func _process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_DOWN):
 		rot_x -= velocita_rotazione * delta
 
-	rot_x = clamp(rot_x, -deg_to_rad(89.0), deg_to_rad(89.0))
+	rot_x = clamp(rot_x, -deg_to_rad(88.0), deg_to_rad(88.0))
 	rotation = Vector3(rot_x, rot_y, 0.0)
 
-	var velocita = velocita_base
+	var vel = velocita_base
 	if Input.is_key_pressed(KEY_SHIFT):
-		velocita *= 2.5
+		vel *= 2.5
 
-	var direzione = Vector3.ZERO
-
+	var dir = Vector3.ZERO
 	if Input.is_key_pressed(KEY_W):
-		direzione -= transform.basis.z
+		dir -= transform.basis.z
 	if Input.is_key_pressed(KEY_S):
-		direzione += transform.basis.z
+		dir += transform.basis.z
 	if Input.is_key_pressed(KEY_A):
-		direzione -= transform.basis.x
+		dir -= transform.basis.x
 	if Input.is_key_pressed(KEY_D):
-		direzione += transform.basis.x
+		dir += transform.basis.x
 	if Input.is_key_pressed(KEY_SPACE):
-		direzione += Vector3.UP
+		dir += Vector3.UP
 	if Input.is_key_pressed(KEY_C):
-		direzione -= Vector3.UP
+		dir -= Vector3.UP
 
-	if direzione != Vector3.ZERO:
-		position += direzione.normalized() * velocita * delta
+	if dir != Vector3.ZERO:
+		position += dir.normalized() * vel * delta
+		print("Nuova posizione: ", position)

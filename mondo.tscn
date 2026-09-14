@@ -1,4 +1,12 @@
-[gd_scene load_steps=2 format=3]
-[ext_resource type="Script" path="res://generatore_mondo.gd" id="1_script"]
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://generatore_mondo.gd" id="1_mondo"]
+[ext_resource type="Script" path="res://telecamera_volo.gd" id="2_telecamera"]
+
 [node name="Mondo" type="Node3D"]
-script = ExtResource("1_script")
+script = ExtResource("1_mondo")
+
+[node name="TelecameraVolo" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.906308, 0.422618, 0, -0.422618, 0.906308, 0, 70, 110)
+current = true
+script = ExtResource("2_telecamera")
