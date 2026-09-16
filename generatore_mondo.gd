@@ -2,6 +2,7 @@ extends Node3D
 
 func _ready() -> void:
 	crea_illuminazione()
+	crea_mare()
 	crea_montagne()
 	print("Catena montuosa stile monte Chiliad generata")
 
@@ -64,17 +65,27 @@ func crea_montagne() -> void:
 	var array = piano.get_mesh_arrays()
 	var vertici = array[Mesh.ARRAY_VERTEX]
 	var altezza_massima = 75.0
+	var raggio_max = 130.0			# Metà della dimensione del piano (260/2)
 
 	for i in range(vertici.size()):
 		var v = vertici[i]
+
+		# Calcolo del canale a cresta viva
 		var raw_noise = rumore_dorsale.get_noise_2d(v.x, v.z)
 		var cresta = 1.0 - abs(raw_noise)
+		cresta = pow(cresta, 2.8)
 
-		cresta = pow(cresta, 2.0)
-
+		# Solchi di erosione
 		var erosione = rumore_erosione.get_noise_2d(v.x, v.z) * 0.12 * cresta
 
-		v.y = (cresta + erosione) * altezza_massima
+		# Maschera di decadimento verso i bordi (effetto isola/costa)
+		var dist_centro = Vector2(v.x, v.z).length()
+		var fattore_bordo = clamp(dist_centro / raggio_max, 0.0, 1.0)
+		var maschera_isola = smoothstep(1.0, 0.2, fattore_bordo)
+
+		# Assicuriamo una base solida rialzata per le vallate interne
+		var h_terra = 2.5 + (cresta + erosione) * altezza_massima
+		v.y = lerp(-15.0, h_terra, maschera_isola)
 		vertici[i] = v
 
 	array[Mesh.ARRAY_VERTEX] = vertici
@@ -92,3 +103,20 @@ func crea_montagne() -> void:
 	mesh_istanza.material_override = mat
 
 	add_child(mesh_istanza)
+
+func crea_mare() -> void:
+	var mare_mesh = PlaneMesh.new()	
+	mare_mesh.size = Vector2(1200, 1200)
+
+	var mat_mare = StandardMaterial3D.new()
+	mat_mare.albedo_color = Color(0.08, 0.24, 0.42)
+	mat_mare.roughness = 0.28
+	mat_mare.metallic = 0.05
+
+	var mare = MeshInstance3D.new()
+	mare.name = "Oceano"
+	mare.mesh = mare_mesh
+	mare.material_override = mat_mare
+	mare.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mare.position.y = 1.2		# Quota del livello del mare
+	add_child(mare)

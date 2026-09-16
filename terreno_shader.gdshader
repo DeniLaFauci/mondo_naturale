@@ -1,10 +1,13 @@
 shader_type spatial;
 
-uniform vec3 colore_erba_secca : source_color = vec3(0.36, 0.32, 0.18);
-uniform vec3 colore_roccia_base : source_color = vec3(0.28, 0.26, 0.23);
-uniform vec3 colore_roccia_chiara : source_color = vec3(0.48, 0.45, 0.40);
+uniform vec3 colore_spiaggia : source_color = vec3(0.76, 0.68, 0.48);
+uniform vec3 colore_prato : source_color = vec3(0.22, 0.38, 0.14);
+uniform vec3 colore_roccia_base : source_color = vec3(0.28, 0.25, 0.22);
+uniform vec3 colore_roccia_chiara : source_color = vec3(0.48, 0.44, 0.38);
+uniform vec3 colore_fondovalle : source_color = vec3(0.12, 0.18, 0.22);
 
-uniform float soglia_pendenza : hint_range(0.0, 1.0) = 0.70;
+uniform float quota_mare = 1.8;
+uniform float soglia_pendenza : hint_range(0.0, 1.0) = 0.68;
 
 varying float quota_mondo;
 varying vec3 pos_locale;
@@ -33,14 +36,23 @@ void fragment() {
 	vec3 normale_mondo = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	float pendenza = normale_mondo.y;
 
-	vec2 uv_fianco = vec2(pos_locale.x * 0.15 + pos_locale.z * 0.15, pos_locale.y * 0.6);
-	float striatura = rumore_striature(uv_fianco);
-	vec3 roccia = mix(colore_roccia_base, colore_roccia_chiara, striatura);
+	// 1. Striature pareti rocciose
+	vec2 uv_fianco = vec2(pos_locale.x * 0.15 + pos_locale.z * 0.15, pos_locale.y * 0.5);
+	vec3 roccia = mix(colore_roccia_base, colore_roccia_chiara, rumore_striature(uv_fianco));
 
-	float fattore_cresta = smoothstep(soglia_pendenza - 0.07, soglia_pendenza + 0.07, pendenza);
-	vec3 colore_finale = mix(roccia, colore_erba_secca, fattore_cresta);
+	// 2. Miscela roccia / prato in base all'inclinazione
+	float fattore_verde = smoothstep(soglia_pendenza - 0.08, soglia_pendenza + 0.08, pendenza);
+	vec3 terra = mix(roccia, colore_prato, fattore_verde);
+
+	// 3. Fascia della spiaggia (tra battiglia e inizio collina)
+	float fattore_sabbia = smoothstep(quota_mare - 0.5, quota_mare + 0.5, quota_mondo);
+	vec3 terra_e_spiaggia = mix(colore_spiaggia, terra, fattore_sabbia);
+
+	// 4. Fondale sommerso scuro e graduale
+	float fattore_sommerso = smoothstep(-6.0, quota_mare - 0.5, quota_mondo);
+	vec3 colore_finale = mix(colore_fondovalle, terra_e_spiaggia, fattore_sommerso);
 
 	ALBEDO = colore_finale;
-	ROUGHNESS = 0.92;
-	SPECULAR = 0.08;
+	ROUGHNESS = 0.88;
+	SPECULAR = 0.10;
 }
