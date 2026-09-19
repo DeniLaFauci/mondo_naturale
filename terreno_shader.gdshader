@@ -2,6 +2,9 @@ shader_type spatial;
 
 uniform vec3 colore_spiaggia : source_color = vec3(0.76, 0.68, 0.48);
 uniform vec3 colore_prato : source_color = vec3(0.22, 0.38, 0.14);
+uniform vec3 colore_erba_dettaglio : source_color = vec3(0.14, 0.26, 0.08);
+uniform float distanza_inizio_erba = 12.0;
+uniform float distanza_fine_erba = 3.5;
 uniform vec3 colore_roccia_base : source_color = vec3(0.28, 0.25, 0.22);
 uniform vec3 colore_roccia_chiara : source_color = vec3(0.48, 0.44, 0.38);
 uniform vec3 colore_fondovalle : source_color = vec3(0.12, 0.18, 0.22);
@@ -40,9 +43,19 @@ void fragment() {
 	vec2 uv_fianco = vec2(pos_locale.x * 0.15 + pos_locale.z * 0.15, pos_locale.y * 0.5);
 	vec3 roccia = mix(colore_roccia_base, colore_roccia_chiara, rumore_striature(uv_fianco));
 
-	// 2. Miscela roccia / prato in base all'inclinazione
+	// 2. Calcolo dettaglio erba ravvicinata (inversamente proporzionale alla distanza)
+	float dist_camera = length(VERTEX);
+	float fade_erba = smoothstep(distanza_inizio_erba, distanza_fine_erba, dist_camera);
+
+	// Trama ad alta frequenza per fili e ciuffi (solo da vicino)
+	vec2 uv_erba = pos_locale.xz * 14.0;
+	float micro_trama = rumore_striature(uv_erba);
+	vec3 prato_dettagliato = mix(colore_prato, colore_erba_dettaglio, micro_trama * 0.45);
+	vec3 prato_finale = mix(colore_prato, prato_dettagliato, fade_erba);
+
+	// Miscela roccia / prato
 	float fattore_verde = smoothstep(soglia_pendenza - 0.08, soglia_pendenza + 0.08, pendenza);
-	vec3 terra = mix(roccia, colore_prato, fattore_verde);
+	vec3 terra = mix(roccia, prato_finale, fattore_verde);
 
 	// 3. Fascia della spiaggia (tra battiglia e inizio collina)
 	float fattore_sabbia = smoothstep(quota_mare - 0.5, quota_mare + 0.5, quota_mondo);
