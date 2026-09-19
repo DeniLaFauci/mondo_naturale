@@ -1,6 +1,7 @@
 shader_type spatial;
 
 uniform vec3 colore_spiaggia : source_color = vec3(0.76, 0.68, 0.48);
+uniform vec3 colore_sabbia_umida : source_color = vec3(0.52, 0.44, 0.30);
 uniform vec3 colore_prato : source_color = vec3(0.22, 0.38, 0.14);
 uniform vec3 colore_erba_dettaglio : source_color = vec3(0.14, 0.26, 0.08);
 uniform float distanza_inizio_erba = 12.0;
@@ -57,12 +58,23 @@ void fragment() {
 	float fattore_verde = smoothstep(soglia_pendenza - 0.08, soglia_pendenza + 0.08, pendenza);
 	vec3 terra = mix(roccia, prato_finale, fattore_verde);
 
-	// 3. Fascia della spiaggia (tra battiglia e inizio collina)
-	float fattore_sabbia = smoothstep(quota_mare - 0.5, quota_mare + 0.5, quota_mondo);
-	vec3 terra_e_spiaggia = mix(colore_spiaggia, terra, fattore_sabbia);
+	// 3. Spiaggia ampliata con grana visibile da vicino
+	vec2 uv_sabbia = pos_locale.xz * 20.0;
+	float micro_sabbia = rumore_striature(uv_sabbia);
+	vec3 sabbia_dettaglio = mix(colore_spiaggia, colore_sabbia_umida, micro_sabbia * 0.35);
+	vec3 sabbia_finale = mix(colore_spiaggia, sabbia_dettaglio, fade_erba);
 
-	// 4. Fondale sommerso scuro e graduale
-	float fattore_sommerso = smoothstep(-6.0, quota_mare - 0.5, quota_mondo);
+	// Allarghiamo la fascia della spiaggia fino a quota_mare + 5.5 metri
+	float fattore_sabbia = smoothstep(quota_mare - 0.2, quota_mare + 5.5, quota_mondo);
+	vec3 terra_e_spiaggia = mix(sabbia_finale, terra, fattore_sabbia);
+
+	// 4. Schiuma della risacca che pulsa sulla battiglia (onda che sale e scende)
+	float onda_battiglia = sin(TIME * 2.2 + pos_locale.x * 0.25 + pos_locale.z * 0.25) * 0.35;
+	float fascia_schiuma = smoothstep(0.18, 0.0, abs(quota_mondo - (quota_mare + onda_battiglia)));
+	terra_e_spiaggia = mix(terra_e_spiaggia, vec3(0.92, 0.95, 0.98), fascia_schiuma * 0.75);
+
+	// 5. Fondale sommerso graduale
+	float fattore_sommerso = smoothstep(-6.0, quota_mare - 0.3, quota_mondo);
 	vec3 colore_finale = mix(colore_fondovalle, terra_e_spiaggia, fattore_sommerso);
 
 	ALBEDO = colore_finale;

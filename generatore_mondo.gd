@@ -102,16 +102,14 @@ func crea_montagne() -> void:
 	mat.shader = load("res://terreno_shader.gdshader")
 	mesh_istanza.material_override = mat
 
-	add_child(mesh_istanza)
+	add_child(mesh_istanza);
 
 func crea_mare() -> void:
 	var mare_mesh = PlaneMesh.new()	
 	mare_mesh.size = Vector2(1200, 1200)
 
-	var mat_mare = StandardMaterial3D.new()
-	mat_mare.albedo_color = Color(0.08, 0.24, 0.42)
-	mat_mare.roughness = 0.28
-	mat_mare.metallic = 0.05
+	var mat_mare = ShaderMaterial.new()
+	mat_mare.shader = load("res://mare_shader.gdshader")
 
 	var mare = MeshInstance3D.new()
 	mare.name = "Oceano"
