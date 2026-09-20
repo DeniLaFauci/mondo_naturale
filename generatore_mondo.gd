@@ -1,5 +1,11 @@
 extends Node3D
 
+var nodo_sole: DirectionalLight3D
+var mat_cielo: ShaderMaterial
+var env_risorse: Environment
+var tempo_giorno: float = 0.25
+const DURATA_GIORNO_SECONDI: float = 240.0
+
 func _ready() -> void:
 	crea_illuminazione()
 	crea_mare()
@@ -8,35 +14,34 @@ func _ready() -> void:
 
 func crea_illuminazione() -> void:
 	# 1. Crea la luce del Sole
-	var sole = DirectionalLight3D.new()
-	sole.name = "Sole"
-	sole.shadow_enabled = true
-	sole.shadow_bias = 0.04
-	sole.shadow_normal_bias = 2.0
-	sole.light_color = Color(1.0, 0.90, 0.78)
-	sole.light_energy = 1.8
-	sole.rotation_degrees = Vector3(-28, 40, 0)
-	add_child(sole)
+	var nodo_sole = DirectionalLight3D.new()
+	nodo_sole.name = "Sole"
+	nodo_sole.shadow_enabled = true
+	nodo_sole.shadow_bias = 0.04
+	nodo_sole.shadow_normal_bias = 2.0
+	nodo_sole.light_color = Color(1.0, 0.90, 0.78)
+	nodo_sole.light_energy = 1.8
+	nodo_sole.rotation_degrees = Vector3(-28, 40, 0)
+	add_child(nodo_sole)
 
 	# 2. Crea il cielo terso e nebbia bassa
-	var env = Environment.new()
-	var cielo_mat = ShaderMaterial.new()
-	cielo_mat.shader = load("res://cielo_shader.gdshader")	
+	var env_risorse = Environment.new()
+	mat_cielo = ShaderMaterial.new()
+	mat_cielo.shader = load("res://cielo_shader.gdshader")	
 
 	var cielo = Sky.new()
-	cielo.sky_material = cielo_mat
-	env.sky = cielo
-	env.background_mode = Environment.BG_SKY
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.55
+	cielo.sky_material = mat_cielo
+	env_risorse.sky = cielo
+	env_risorse.background_mode = Environment.BG_SKY
+	env_risorse.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 
 	# Nebbia all'orizzonte per fondere i bordi
-	env.fog_enabled = false
-	env.fog_light_color = Color(0.75, 0.75, 0.78)
-	env.fog_density = 0.0012
+	env_risorse.fog_enabled = false
+	env_risorse.fog_light_color = Color(0.75, 0.75, 0.78)
+	env_risorse.fog_density = 0.0012
 
 	var world_env = WorldEnvironment.new()
-	world_env.environment = env
+	world_env.environment = env_risorse
 	add_child(world_env)
 
 func crea_montagne() -> void:
@@ -115,3 +120,30 @@ func crea_mare() -> void:
 	mare.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mare.position.y = 1.2		# Quota del livello del mare
 	add_child(mare)
+
+func _process(delta: float) -> void:
+	tempo_giorno += delta / DURATA_GIORNO_SECONDI
+	if tempo_giorno > 1.0:
+		tempo_giorno -= 1.0
+
+	var angolo = tempo_giorno * TAU - (PI * 0.5)
+	var dir_sole = Vector3(cos(angolo), sin(angolo), sin(angolo * 0.5) * 0.35).normalized()
+
+	if nodo_sole:
+		nodo_sole.rotation.x = -asin(clamp(dir_sole.y, -1.0, 1.0))
+		nodo_sole.rotation.y = atan2(dir_sole.x, dir_sole.z)
+
+		var alt = dir_sole.y
+		if alt > 0.0:
+			nodo_sole.light_energy = lerp(0.0, 1.6, clamp(alt * 4.0, 0.0, 1.0))
+			nodo_sole.light_color = Color(1.0, 0.5, 0.2).lerp(Color(1.0, 0.96, 0.88), clamp(alt * 3.0, 0.0, 1.0))
+		else:
+			nodo_sole.light_enery = 0.0
+
+	if mat_cielo:
+		mat_cielo.set_shader_parameter("direzione_sole", dir_sole)
+	
+	if env_risorse:
+		var luce_amb = lerp(0.05, 0.65, clamp(dir_sole.y * 3.0 + 0.2, 0.0, 1.0))
+		env_risorse.ambient_light_energy = luce_amb
+
