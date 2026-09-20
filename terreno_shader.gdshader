@@ -6,9 +6,10 @@ uniform vec3 colore_prato : source_color = vec3(0.22, 0.38, 0.14);
 uniform vec3 colore_erba_dettaglio : source_color = vec3(0.14, 0.26, 0.08);
 uniform float distanza_inizio_erba = 12.0;
 uniform float distanza_fine_erba = 3.5;
-uniform vec3 colore_roccia_base : source_color = vec3(0.28, 0.25, 0.22);
-uniform vec3 colore_roccia_chiara : source_color = vec3(0.48, 0.44, 0.38);
-uniform vec3 colore_fondovalle : source_color = vec3(0.12, 0.18, 0.22);
+uniform vec3 colore_roccia_base : source_color = vec3(0.55, 0.54, 0.52);
+uniform vec3 colore_roccia_chiara : source_color = vec3(0.74, 0.73, 0.70);
+uniform vec3 colore_roccia_crepa : source_color = vec3(0.34, 0.33, 0.32);
+uniform vec3 colore_fondovalle : source_color = vec3(0.28, 0.22, 0.17);
 
 uniform float quota_mare = 1.8;
 uniform float soglia_pendenza : hint_range(0.0, 1.0) = 0.68;
@@ -36,17 +37,63 @@ float rumore_striature(vec2 uv) {
 	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
+// Generatore frattale per pareti montuose erose
+float fbm_falda(vec2 p) {
+	float s = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i ++) {
+		s += a * rumore_striature(p);
+		p = p * 2.1 + vec2(1.7, 9.2);
+		a * 0.5;
+	}
+	return s;
+}
+
+// Solchi verticali a canne d'organo e rotture vive (stile calanchi/gole)
+float texture_roccia_3d(vec3 p) {
+	// Canali di erosione verticali incisi (frequenza alta in orizzontale, allungata i Y)
+	vec2 uv_canale = vec2(p.x * 0.95 + p.z * 0.95, p.y * 0.28);
+	float v = fbm_falda(uv_canale);
+
+	// Inverte e squadrata la cresta per simulare le gole scavate
+	float gole = 1.0 - abs(v * 2.0 - 1.0);
+	gole = pow(gole, 1.5);
+
+	// Micro-porosità lapidea e granulosità da vicino
+	vec2 uv_grana = vec2(p.x * 8.0 + p.z * 8.0, p.y * 6.0);
+	float grana = rumore_striature(uv_grana);
+
+	return mix(gole, grana, 0.30);
+}
+
 void fragment() {
 	vec3 normale_mondo = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	float pendenza = normale_mondo.y;
 
-	// 1. Striature pareti rocciose
-	vec2 uv_fianco = vec2(pos_locale.x * 0.15 + pos_locale.z * 0.15, pos_locale.y * 0.5);
-	vec3 roccia = mix(colore_roccia_base, colore_roccia_chiara, rumore_striature(uv_fianco));
+	// 1. Solchi, pareti e balze con dominante chiara
+	float pattern_roccia = texture_roccia_3d(pos_locale);
+
+	// Gradienti a tre livelli: fessura scura, corpo base, cresta chiara
+	vec3 roccia = mix(colore_roccia_crepa, colore_roccia_base, smoothstep(0.05, 0.20, pattern_roccia));
+	roccia = mix(roccia, colore_roccia_chiara, smoothstep(0.25, 0.60, pattern_roccia));
 
 	// 2. Calcolo dettaglio erba ravvicinata (inversamente proporzionale alla distanza)
 	float dist_camera = length(VERTEX);
 	float fade_erba = smoothstep(distanza_inizio_erba, distanza_fine_erba, dist_camera);
+
+	// Più ci si avvicina alla parete, più la normale diventa tagliente e rugosa
+	float fade_roccia_vicina = smoothstep(30.0, 3.0, dist_camera);
+	float intensita_rilievo = mix(2.5, 6.5, fade_roccia_vicina);
+
+
+	float eps = 0.035;
+	float dx = texture_roccia_3d(pos_locale + vec3(eps, 0.0, 0.0)) - pattern_roccia;
+	float dy = texture_roccia_3d(pos_locale + vec3(0.0, eps, 0.0)) - pattern_roccia;
+	float dz = texture_roccia_3d(pos_locale + vec3(0.0, 0.0, eps)) - pattern_roccia;
+	vec3 gradiente = vec3(dx, dy, dz);
+
+	// Applichiamo forte rilievo sulla normale
+	vec3 normale_roccia = normalize(NORMAL - gradiente * intensita_rilievo);
 
 	// Trama ad alta frequenza per fili e ciuffi (solo da vicino)
 	vec2 uv_erba = pos_locale.xz * 14.0;
@@ -77,7 +124,10 @@ void fragment() {
 	float fattore_sommerso = smoothstep(-6.0, quota_mare - 0.3, quota_mondo);
 	vec3 colore_finale = mix(colore_fondovalle, terra_e_spiaggia, fattore_sommerso);
 
+	// Applica la rugosità fisica solo alle pareti rocciose (non su spiaggia ed erba piana)
+	NORMAL = mix(NORMAL, normale_roccia, (1.0 - fattore_verde) * step(quota_mare, quota_mondo));
+
 	ALBEDO = colore_finale;
-	ROUGHNESS = 0.88;
-	SPECULAR = 0.10;
+	ROUGHNESS = mix(0.98, 0.82, pattern_roccia);
+	SPECULAR = 0.05;
 }
