@@ -20,21 +20,18 @@ func crea_illuminazione() -> void:
 
 	# 2. Crea il cielo terso e nebbia bassa
 	var env = Environment.new()
-	var cielo_mat = ProceduralSkyMaterial.new()
-	cielo_mat.sky_top_color = Color(0.20, 0.44, 0.82)
-	cielo_mat.sky_horizon_color = Color(0.78, 0.75, 0.70)
-	cielo_mat.ground_bottom_color = Color(0.16, 0.15, 0.14)
-	cielo_mat.ground_horizon_color = Color(0.68, 0.65, 0.60)
+	var cielo_mat = ShaderMaterial.new()
+	cielo_mat.shader = load("res://cielo_shader.gdshader")	
 
 	var cielo = Sky.new()
 	cielo.sky_material = cielo_mat
 	env.sky = cielo
 	env.background_mode = Environment.BG_SKY
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.35
+	env.ambient_light_energy = 0.55
 
 	# Nebbia all'orizzonte per fondere i bordi
-	env.fog_enabled = true
+	env.fog_enabled = false
 	env.fog_light_color = Color(0.75, 0.75, 0.78)
 	env.fog_density = 0.0012
 
