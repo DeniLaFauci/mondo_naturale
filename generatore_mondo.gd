@@ -2,9 +2,10 @@ extends Node3D
 
 var nodo_sole: DirectionalLight3D
 var mat_cielo: ShaderMaterial
+var mat_mare: ShaderMaterial
 var env_risorse: Environment
-var tempo_giorno: float = 0.25
-const DURATA_GIORNO_SECONDI: float = 240.0
+var tempo_giorno: float = 0.25	# Parte verso mattina/mezzogiorno
+const DURATA_GIORNO_SECONDI: float = 240.0 # 4 minuti per fare un giorno intero
 
 func _ready() -> void:
 	crea_illuminazione()
@@ -110,7 +111,7 @@ func crea_mare() -> void:
 	var mare_mesh = PlaneMesh.new()	
 	mare_mesh.size = Vector2(1200, 1200)
 
-	var mat_mare = ShaderMaterial.new()
+	mat_mare = ShaderMaterial.new()
 	mat_mare.shader = load("res://mare_shader.gdshader")
 
 	var mare = MeshInstance3D.new()
@@ -130,8 +131,8 @@ func _process(delta: float) -> void:
 	var dir_sole = Vector3(cos(angolo), sin(angolo), sin(angolo * 0.5) * 0.35).normalized()
 
 	if nodo_sole:
-		nodo_sole.rotation.x = -asin(clamp(dir_sole.y, -1.0, 1.0))
-		nodo_sole.rotation.y = atan2(dir_sole.x, dir_sole.z)
+		# Posizioniamo e orientiamo la luce verso l'origine con vettore inverso per proiettare le ombre
+		nodo_sole.look_at_from_position(dir_sole * 100.0, Vector3.ZERO, Vector3.UP)
 
 		var alt = dir_sole.y
 		if alt > 0.0:
@@ -142,6 +143,11 @@ func _process(delta: float) -> void:
 
 	if mat_cielo:
 		mat_cielo.set_shader_parameter("direzione_sole", dir_sole)
+
+	if mat_mare:
+		mat_mare.set_shader_parameter("direzione_sole", dir_sole)
+		var colore_sole_calc = Color(1.0, 0.5, 0.2).lerp(Color(1.0, 0.95, 0.88), clamp(dir_sole.y * 3.0, 0.0, 1.0))
+		mat_mare.set_shader_parameter("colore_luce_solare", Vector3(colore_sole_calc.r, colore_sole_calc.g, colore_sole_calc.b))
 	
 	if env_risorse:
 		var luce_amb = lerp(0.05, 0.65, clamp(dir_sole.y * 3.0 + 0.2, 0.0, 1.0))
