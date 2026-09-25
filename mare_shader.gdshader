@@ -31,23 +31,15 @@ void fragment() {
 	float fattore_giorno_mare = smoothstep(-0.05, 0.25, quota_s);
 	vec3 base_profonda = mix(vec3(0.01, 0.03, 0.06), colore_profondo, fattore_giorno_mare);
 	vec3 base_cresta = mix(vec3(0.02, 0.05, 0.10), colore_cresta, fattore_giorno_mare);	
-	vec3 colore_acqua = mix(base_profonda, base_cresta, onda * fade_increspature);
 
-	// Riflesso solare: scia allungata sull'acqua specialmente al tramonto (luce radente)
-	vec3 dir_s = normalize(direzione_sole);
-	vec3 dir_v = normalize(VIEW);
-	vec3 dir_h = normalize(dir_s + dir_v);
+	// L'acqua si scurisce naturalmente quando cala la notte;
+	float fattore_luce = smoothstep(-0.05, 0.20, quota_s);
 
-	// Più il sole è basso, più la scia speculare si stende orizzontalmente sull'orizzonte
-	float esponente_spec = mix(32.0, 140.0, clamp(dir_s.y * 2.0, 0.0, 1.0));
-	float spec_intensita = pow(max(dot(NORMAL, dir_h), 0.0), esponente_spec);
-
-	// Il riflesso resta visibile finché il sole tocca l'orizzonte (-0.05)
-	float visibilita_riflesso = smoothstep(-0.06, 0.08, dir_s.y);
-	vec3 riflesso_solare = colore_luce_sole * spec_intensita * visibilita_riflesso * 3.5;
+	vec3 mare_notturno = vec3(0.005, 0.010, 0.020);
+	vec3 mare_diurno = mix(colore_profondo, colore_cresta, onda * fade_increspature);
+	vec3 colore_acqua = mix(mare_notturno, mare_diurno, fattore_luce);
 
 	ALBEDO = colore_acqua;
-	ROUGHNESS = mix(0.18, 0.08, onda * fade_increspature);
-	SPECULAR = 0.6;
-	EMISSION = riflesso_solare;
+	ROUGHNESS = mix(0.12, 0.05, onda * fade_increspature);
+	SPECULAR = 0.5;
 }

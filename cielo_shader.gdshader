@@ -3,9 +3,10 @@ shader_type sky;
 uniform vec3 direzione_sole = vec3(0.0, 1.0, 0.0);
 uniform float velocita_vento = 0.02;
 
-// Colori Giorno
-uniform vec3 cielo_zenith_giorno : source_color = vec3(0.18, 0.42, 0.78);
-uniform vec3 cielo_orizzonte_giorno : source_color = vec3(0.69, 0.72, 0.85);
+// Colori Giorno: Ciano vivido, luminoso e saturo
+uniform vec3 cielo_zenith_giorno : source_color = vec3(0.02, 0.50, 0.88);
+uniform vec3 cielo_orizzonte_giorno : source_color = vec3(0.38, 0.82, 0.96);
+uniform vec3 bagliore_sole_giorno : source_color = vec3(0.70, 0.94, 1.0);
 
 // Colori Tramonto / Alba (lato sole)
 uniform vec3 cielo_zenith_tramonto : source_color = vec3(0.14, 0.16, 0.35);
@@ -54,25 +55,35 @@ void sky() {
 	float crepuscolo = (1.0 - giorno_puro) * (1.0 - notte_pura);
 
 	float h = clamp(EYEDIR.y, 0.0, 1.0);
-	vec3 col_giorno = mix(cielo_orizzonte_giorno, cielo_zenith_giorno, pow(h, 0.55));
+
+	// Gradiente diurno dinamico: più chiaro e brillante verso il quadrante del sole
+	vec3 base_giorno = mix(cielo_orizzonte_giorno, cielo_zenith_giorno, pow(h, 0.6));
+	float schiarita_sole = pow(verso_sole, 1.8) * (1.0 - h * 0.4);
+	vec3 col_giorno = mix(base_giorno, bagliore_sole_giorno, schiarita_sole * 0.45);
 	vec3 col_notte = mix(cielo_orizzonte_notte, cielo_zenith_notte, pow(h, 0.55));
 
-	// Verso il sole arancio vivo; alle spalle del sole viola scuro/notte
+	// Crepuscolo con antielio (arancio verso il sole, viola / bluastro opposto)
 	vec3 col_orizzonte_crep = mix(cielo_orizzonte_opposto, cielo_orizzonte_tramonto, pow(verso_sole, 1.6));
 	vec3 col_zenith_crep = mix(cielo_zenith_notte, cielo_zenith_tramonto, verso_sole);
 	vec3 col_crepuscolo = mix(col_orizzonte_crep, col_zenith_crep, pow(h, 0.55));
 
 	vec3 sfondo = mix(mix(col_notte, col_crepuscolo, crepuscolo), col_giorno, giorno_puro);
 
-	// 2. Stelle: compaiono solo dove il cielo è buio (a notte o alle spalle del sole al tramonto)
+	// 2. Stelle naturali: punti fini e nitidi, senza distorsioni a griglia
 	float oscurita_locale = (1.0 - giorno_puro) * mix(1.0, 0.0, crepuscolo * verso_sole);
-	float visibilita_stelle = smoothstep(0.55, 0.95, oscurita_locale);
-	if (visibilita_stelle > 0.001 && EYEDIR.y > 0.04) {
-		vec2 uv_stelle = EYEDIR.xz / (EYEDIR.y + 0.35) * 160.0;
-		float rnd = hash_cielo(floor(uv_stelle));
-		if (rnd > 0.988) {
-			float lum = pow(hash_cielo(floor(uv_stelle) * 2.1), 5.0);
-			sfondo += vec3(lum * visibilita_stelle * 1.5);
+	float visibilita_stelle = smoothstep(0.65, 0.95, oscurita_locale);
+	float fade_orizzonte = smoothstep(0.06, 0.28, EYEDIR.y);
+
+	if (visibilita_stelle > 0.01 && fade_orizzonte > 0.01) {
+		vec3 dir_v = normalize(EYEDIR);
+		vec3 cella = floor(dir_v * 180.0);
+		float rnd = fract(sin(dot(cella, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+		if (rnd > 0.993) {
+			vec3 centro = (cella + vec3(0.5)) / 180.0;
+			float d = length(dir_v - normalize(centro));
+			float intensita = smoothstep(0.0035, 0.0, d);
+			float scintillio = fract(sin(dot(cella, vec3(93.1, 17.7, 43.3))) * 23421.63);
+			sfondo += vec3(intensita * pow(scintillio, 2.5) * visibilita_stelle * fade_orizzonte * 2.2);
 		}
 	}
 

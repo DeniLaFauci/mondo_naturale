@@ -14,15 +14,14 @@ func _ready() -> void:
 	print("Catena montuosa stile monte Chiliad generata")
 
 func crea_illuminazione() -> void:
-	# 1. Crea la luce del Sole
-	var nodo_sole = DirectionalLight3D.new()
+	# 1. Crea la luce del Sole (assegnata alla variabile globale!)
+	nodo_sole = DirectionalLight3D.new()
 	nodo_sole.name = "Sole"
 	nodo_sole.shadow_enabled = true
 	nodo_sole.shadow_bias = 0.04
 	nodo_sole.shadow_normal_bias = 2.0
 	nodo_sole.light_color = Color(1.0, 0.90, 0.78)
 	nodo_sole.light_energy = 1.8
-	nodo_sole.rotation_degrees = Vector3(-28, 40, 0)
 	add_child(nodo_sole)
 
 	# 2. Crea il cielo terso e nebbia bassa
@@ -139,7 +138,7 @@ func _process(delta: float) -> void:
 			nodo_sole.light_energy = lerp(0.0, 1.6, clamp(alt * 4.0, 0.0, 1.0))
 			nodo_sole.light_color = Color(1.0, 0.5, 0.2).lerp(Color(1.0, 0.96, 0.88), clamp(alt * 3.0, 0.0, 1.0))
 		else:
-			nodo_sole.light_enery = 0.0
+			nodo_sole.light_energy = 0.0
 
 	if mat_cielo:
 		mat_cielo.set_shader_parameter("direzione_sole", dir_sole)
