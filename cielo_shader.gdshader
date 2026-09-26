@@ -1,7 +1,13 @@
 shader_type sky;
 
 uniform vec3 direzione_sole = vec3(0.0, 1.0, 0.0);
-uniform float velocita_vento = 0.02;
+uniform vec2 velocita_vento = vec2(0.02, 0.006);
+
+// Parametri Meteo Procedurale
+uniform float copertura_nubi : hint_range(0.0, 1.0) = 0.5;
+uniform float scala_nubi : hint_range(0.1, 5.0) = 1.0;
+uniform float densita_dettaglio : hint_range(0.0, 1.0) = 0.35;
+uniform float oscuramento_pioggia : hint_range(0.0, 1.0) = 0.0;
 
 // Colori Giorno: Ciano vivido, luminoso e saturo
 uniform vec3 cielo_zenith_giorno : source_color = vec3(0.02, 0.50, 0.88);
@@ -96,20 +102,44 @@ void sky() {
 		sfondo += (disco * 2.5 + alone) * tinta_sole;
 	}
 
-	// 4, Nuvole (Illuminate dal sole e scure di notte)
-	vec2 uv = EYEDIR.xz / max(EYEDIR.y + 0.15, 0.08);
-	vec2 vento = vec2(TIME * velocita_vento, TIME * velocita_vento * 0.3);
+	// 4. Disco della luna (posizionato all'opposto del Sole)
+	vec3 dir_luna = -dir_s;
+	float cos_angolo_luna = dot(EYEDIR, dir_luna);
+	if (cos_angolo_luna > 0.0 && dir_luna.y > -0.05) {
+		float disco_luna = smoothstep(0.9993, 0.9997, cos_angolo_luna);
+		float alone_luna = pow(max(0.0, cos_angolo_luna), 160.0) * 0.25;
+		vec3 tinta_luna = vec3(0.85, 0.92, 1.0);
+		float fade_luna = smoothstep(0.30, 0.75, oscurita_locale);
+		sfondo += (disco_luna * 1.8 + alone_luna) * tinta_luna * fade_luna;
+	}
 
-	float nubi = fbm(uv * 0.4 + vento);
-	float velo = fbm(uv * 1.2 - vento * 1.5) * 0.35;
-	float densita = smoothstep(0.38, 0.70, nubi + velo);
-	
-	vec3 nube_base = mix(vec3(0.04, 0.05, 0.07), vec3(0.95, 0.95, 0.98), giorno_puro);
-	vec3 nube_ombra = mix(vec3(0.015, 0.02, 0.03), vec3(0.35, 0.38, 0.45), giorno_puro);
-	nube_base = mix(nube_base, vec3(0.95, 0.40, 0.15), crepuscolo * verso_sole * 0.9);
+	// 5. Nuvole Procedurali Dinamiche
+	if (copertura_nubi > 0.02) {
+		vec2 uv = (EYEDIR.xz / max(EYEDIR.y + 0.16, 0.07)) * (0.35 * scala_nubi);
+		vec2 moto = velocita_vento * TIME;
 
-	vec3 colore_nube = mix(nube_ombra, nube_base, smoothstep(0.40, 0.75, nubi));
-	float maschera_cielo = smoothstep(0.0, 0.12, EYEDIR.y);
+		float nubi_macro = fbm(uv + moto);
+		float nubi_micro = fbm(uv * 2.4 - moto * 1.3) * densita_dettaglio;
+		float rumore_totale = nubi_macro + nubi_micro;
 
-	COLOR = mix(sfondo, colore_nube, densita * maschera_cielo);
+		// Soglia dinamica determinata dal meteo estratto
+		float soglia_min = mix(0.75, 0.25, copertura_nubi);
+		float soglia_max = soglia_min + mix(0.40, 0.15, copertura_nubi);
+		float densita = smoothstep(soglia_min, soglia_max, rumore_totale);
+
+		// Colori nubi: bianche/chiare di giorno, cariche di pioggia o arancio al tramonto
+		vec3 col_nube_giorno = mix(vec3(0.95, 0.96, 0.98), vec3(0.35, 0.37, 0.40), oscuramento_pioggia);
+		vec3 col_ombra_giorno = mix(vec3(0.40, 0.45, 0.52), vec3(0.18, 0.20, 0.24), oscuramento_pioggia);
+
+		vec3 nube_base = mix(vec3(0.03, 0.04, 0.06), col_nube_giorno, giorno_puro);
+		vec3 nube_ombra = mix(vec3(0.01, 0.015, 0.02), col_ombra_giorno, giorno_puro);
+		nube_base = mix(nube_base, vec3(0.96, 0.42, 0.12), crepuscolo * verso_sole * (1.0 - oscuramento_pioggia * 0.7));
+
+		vec3 colore_nube = mix(nube_ombra, nube_base, smoothstep(soglia_min, soglia_max + 0.1, rumore_totale));
+		float maschera_orizzonte = smoothstep(0.01, 0.14, EYEDIR.y);
+
+		COLOR = mix(sfondo, colore_nube, densita * maschera_orizzonte);
+	} else {
+		COLOR = sfondo;
+	}
 }

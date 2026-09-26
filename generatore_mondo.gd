@@ -8,9 +8,11 @@ var tempo_giorno: float = 0.25	# Parte verso mattina/mezzogiorno
 const DURATA_GIORNO_SECONDI: float = 240.0 # 4 minuti per fare un giorno intero
 
 func _ready() -> void:
+	randomize()
 	crea_illuminazione()
 	crea_mare()
 	crea_montagne()
+	estrai_meteo_casuale()
 	print("Catena montuosa stile monte Chiliad generata")
 
 func crea_illuminazione() -> void:
@@ -146,9 +148,64 @@ func _process(delta: float) -> void:
 	if mat_mare:
 		mat_mare.set_shader_parameter("direzione_sole", dir_sole)
 		var colore_sole_calc = Color(1.0, 0.5, 0.2).lerp(Color(1.0, 0.95, 0.88), clamp(dir_sole.y * 3.0, 0.0, 1.0))
-		mat_mare.set_shader_parameter("colore_luce_solare", Vector3(colore_sole_calc.r, colore_sole_calc.g, colore_sole_calc.b))
+		mat_mare.set_shader_parameter("colore_luce_sole", Vector3(colore_sole_calc.r, colore_sole_calc.g, colore_sole_calc.b))
 	
 	if env_risorse:
 		var luce_amb = lerp(0.05, 0.65, clamp(dir_sole.y * 3.0 + 0.2, 0.0, 1.0))
 		env_risorse.ambient_light_energy = luce_amb
 
+func estrai_meteo_casuale() -> void:
+	if not mat_cielo:
+		return
+
+	var tipi_meteo = [
+		{
+			"nome": "Sereno Limpido",
+			"copertura": 0.0,
+			"scala": 1.0,
+			"dettaglio": 0.0,
+			"pioggia": 0.0,
+			"vento": Vector2(0.01, 0.003)
+		},
+		{
+			"nome": "Velature e Cirri Alti",
+			"copertura": 0.28,
+			"scala": 0.45,
+			"dettaglio": 0.15,
+			"pioggia": 0.0,
+			"vento": Vector2(0.035, 0.012)
+		},
+		{
+			"nome": "Altocumuli (Cielo a pecorelle)",
+			"copertura": 0.52,
+			"scala": 2.4,
+			"dettaglio": 0.60,
+			"pioggia": 0.0,
+			"vento": Vector2(0.018, 0.008)
+		},
+		{
+			"nome": "Cumuli Sparsi Costieri",
+			"copertura": 0.55,
+			"scala": 0.95,
+			"dettaglio": 0.35,
+			"pioggia": 0.0,
+			"vento": Vector2(0.022, 0.005)
+		},
+		{
+			"nome": "Coperto Minaccioso",
+			"copertura": 0.88,
+			"scala": 1.1,
+			"dettaglio": 0.50,
+			"pioggia": 0.85,
+			"vento": Vector2(0.045, 0.02)
+		}
+	]
+
+	var meteo_estratto = tipi_meteo[randi() % tipi_meteo.size()]
+	print(">>> METEO ESTRATTO ALL'AVVIO: ", meteo_estratto["nome"])
+
+	mat_cielo.set_shader_parameter("copertura_nubi", meteo_estratto["copertura"])
+	mat_cielo.set_shader_parameter("scala_nubi", meteo_estratto["scala"])
+	mat_cielo.set_shader_parameter("densita_dettaglio", meteo_estratto["dettaglio"])
+	mat_cielo.set_shader_parameter("oscuramento_pioggia", meteo_estratto["pioggia"])
+	mat_cielo.set_shader_parameter("velocita_vento", meteo_estratto["vento"])
