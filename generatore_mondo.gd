@@ -4,6 +4,15 @@ var nodo_sole: DirectionalLight3D
 var mat_cielo: ShaderMaterial
 var mat_mare: ShaderMaterial
 var env_risorse: Environment
+var meteo_attuale: String = ""
+var meteo_estratto: Dictionary = {}
+var nodo_fulmine: MeshInstance3D
+var mat_fulmine: StandardMaterial3D
+var timer_prossimo_fulmine: float = 3.0
+var lampo_attivo: bool = false
+var durata_lampo: float = 0.0
+var frame_flicker: int = 0
+
 var tempo_giorno: float = 0.25	# Parte verso mattina/mezzogiorno
 const DURATA_GIORNO_SECONDI: float = 240.0 # 4 minuti per fare un giorno intero
 
@@ -12,6 +21,7 @@ func _ready() -> void:
 	crea_illuminazione()
 	crea_mare()
 	crea_montagne()
+	crea_nodo_fulmine()
 	estrai_meteo_casuale()
 	print("Catena montuosa stile monte Chiliad generata")
 
@@ -136,8 +146,9 @@ func _process(delta: float) -> void:
 		nodo_sole.look_at_from_position(dir_sole * 100.0, Vector3.ZERO, Vector3.UP)
 
 		var alt = dir_sole.y
+		var fattore_buio_pioggia = 0.35 if (meteo_attuale == "Coperto Minaccioso") else 1.0
 		if alt > 0.0:
-			nodo_sole.light_energy = lerp(0.0, 1.6, clamp(alt * 4.0, 0.0, 1.0))
+			nodo_sole.light_energy = lerp(0.0, 1.6, clamp(alt * 4.0, 0.0, 1.0)) * fattore_buio_pioggia
 			nodo_sole.light_color = Color(1.0, 0.5, 0.2).lerp(Color(1.0, 0.96, 0.88), clamp(alt * 3.0, 0.0, 1.0))
 		else:
 			nodo_sole.light_energy = 0.0
@@ -153,6 +164,8 @@ func _process(delta: float) -> void:
 	if env_risorse:
 		var luce_amb = lerp(0.05, 0.65, clamp(dir_sole.y * 3.0 + 0.2, 0.0, 1.0))
 		env_risorse.ambient_light_energy = luce_amb
+
+	gestisci_temporale(delta)
 
 func estrai_meteo_casuale() -> void:
 	if not mat_cielo:
@@ -193,19 +206,96 @@ func estrai_meteo_casuale() -> void:
 		},
 		{
 			"nome": "Coperto Minaccioso",
-			"copertura": 0.88,
-			"scala": 1.1,
-			"dettaglio": 0.50,
-			"pioggia": 0.85,
-			"vento": Vector2(0.045, 0.02)
+			"copertura": 1.0,
+			"scala": 0.9,
+			"dettaglio": 0.65,
+			"pioggia": 1.0,
+			"vento": Vector2(0.06, 0.025)
 		}
 	]
 
 	var meteo_estratto = tipi_meteo[randi() % tipi_meteo.size()]
-	print(">>> METEO ESTRATTO ALL'AVVIO: ", meteo_estratto["nome"])
+	#var meteo_estratto = tipi_meteo[4]
+	meteo_attuale = meteo_estratto["nome"]
+	print(">>> METEO ESTRATTO ALL'AVVIO: ", meteo_attuale)
 
 	mat_cielo.set_shader_parameter("copertura_nubi", meteo_estratto["copertura"])
 	mat_cielo.set_shader_parameter("scala_nubi", meteo_estratto["scala"])
 	mat_cielo.set_shader_parameter("densita_dettaglio", meteo_estratto["dettaglio"])
 	mat_cielo.set_shader_parameter("oscuramento_pioggia", meteo_estratto["pioggia"])
 	mat_cielo.set_shader_parameter("velocita_vento", meteo_estratto["vento"])
+
+	if mat_mare:
+		mat_mare.set_shader_parameter("oscuramento_pioggia", meteo_estratto["pioggia"])
+
+func crea_nodo_fulmine() -> void:
+	nodo_fulmine = MeshInstance3D.new()
+	mat_fulmine = StandardMaterial3D.new()
+	mat_fulmine.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat_fulmine.albedo_color = Color(1.8, 2.0, 2.5)
+	mat_fulmine.cull_mode = BaseMaterial3D.CULL_DISABLED
+	nodo_fulmine.material_override = mat_fulmine
+	nodo_fulmine.visible = false
+	add_child(nodo_fulmine)
+
+func gestisci_temporale(delta: float) -> void:
+	if meteo_attuale != "Coperto Minaccioso":
+		if nodo_fulmine:
+			nodo_fulmine.visible = false
+		if mat_cielo:
+			mat_cielo.set_shader_parameter("intensita_lampo", 0.0)
+		return
+
+	if not lampo_attivo:
+		timer_prossimo_fulmine -= delta
+		if timer_prossimo_fulmine <= 0.0:
+			scocca_fulmine()
+	else:
+		durata_lampo -= delta
+		frame_flicker += 1
+
+		# Effetto strobo / flicker rapido tipico del fulmine
+		var flash = 1.0 if (frame_flicker % 2 == 0) else 0.3
+		if durata_lampo <= 0.0:
+			lampo_attivo = false
+			nodo_fulmine.visible = false
+			timer_prossimo_fulmine = randf_range(2.5, 6.0)
+			if mat_cielo: mat_cielo.set_shader_parameter("intensita_lampo", 0.0)
+		else:
+			if mat_cielo: mat_cielo.set_shader_parameter("intensita_lampo", flash * 2.0)
+			if env_risorse: env_risorse.ambient_light_energy = 0.8 * flash
+
+func scocca_fulmine() -> void:
+	lampo_attivo = true
+	durata_lampo = randf_range(0.12, 0.22)
+	frame_flicker = 0
+
+	# Punto di origine in quota e bersaglio (terra o mare)
+	var x_start = randf_range(-100.0, 100.0)
+	var z_start = randf_range(-100.0, 100.0)
+	var p_inizio = Vector3(x_start, 68.0, z_start)
+	var p_fine = Vector3(x_start + randf_range(-20.0, 20.0), 2.0, z_start + randf_range(-20.0, 20.0))
+
+	# Genera la linea spezzata a nastro
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+
+	var punti: Array[Vector3] = []
+	var num_segmenti = 14
+	punti.append(p_inizio)
+
+	for i in range(1, num_segmenti):
+		var t = float(i) / float(num_segmenti)
+		var p_base = p_inizio.lerp(p_fine, t)
+		var deviazione = Vector3(randf_range(-3.5, 3.5), randf_range(-1.0, 1.0), randf_range(-3.5, 3.5))
+		punti.append(p_base + deviazione)
+	punti.append(p_fine)
+
+	# Crea un nastro con larghezza visibile
+	var larghezza = 0.4
+	for p in punti:
+		st.add_vertex(p + Vector3(-larghezza, 0.0, larghezza))
+		st.add_vertex(p + Vector3(larghezza, 0.0, -larghezza))
+
+	nodo_fulmine.mesh = st.commit()
+	nodo_fulmine.visible = true

@@ -8,6 +8,7 @@ uniform float copertura_nubi : hint_range(0.0, 1.0) = 0.5;
 uniform float scala_nubi : hint_range(0.1, 5.0) = 1.0;
 uniform float densita_dettaglio : hint_range(0.0, 1.0) = 0.35;
 uniform float oscuramento_pioggia : hint_range(0.0, 1.0) = 0.0;
+uniform float intensita_lampo : hint_range(0.0, 3.0) = 0.0;
 
 // Colori Giorno: Ciano vivido, luminoso e saturo
 uniform vec3 cielo_zenith_giorno : source_color = vec3(0.02, 0.50, 0.88);
@@ -75,9 +76,15 @@ void sky() {
 
 	vec3 sfondo = mix(mix(col_notte, col_crepuscolo, crepuscolo), col_giorno, giorno_puro);
 
+	// Se c'è pioggia / temporale: grigio ardesia in alto e perla chiaro all'orizzonte
+	vec3 orizzonte_temp = vec3(0.58, 0.62, 0.68) * giorno_puro;
+	vec3 zenith_temp = vec3(0.16, 0.19, 0.25) * giorno_puro;
+	vec3 cielo_plumbeo = mix(orizzonte_temp, zenith_temp, pow(h, 0.45));
+	sfondo = mix(sfondo, cielo_plumbeo, oscuramento_pioggia * 0.95);
+
 	// 2. Stelle naturali: punti fini e nitidi, senza distorsioni a griglia
 	float oscurita_locale = (1.0 - giorno_puro) * mix(1.0, 0.0, crepuscolo * verso_sole);
-	float visibilita_stelle = smoothstep(0.65, 0.95, oscurita_locale);
+	float visibilita_stelle = smoothstep(0.65, 0.95, oscurita_locale) * (1.0 - oscuramento_pioggia);
 	float fade_orizzonte = smoothstep(0.06, 0.28, EYEDIR.y);
 
 	if (visibilita_stelle > 0.01 && fade_orizzonte > 0.01) {
@@ -99,7 +106,7 @@ void sky() {
 		float disco = smoothstep(0.9992, 0.9997, cos_angolo_sole);
 		float alone = pow(max(0.0, cos_angolo_sole), 280.0) * 0.4;
 		vec3 tinta_sole = mix(vec3(1.0, 0.32, 0.04), vec3(1.0, 0.97, 0.90), smoothstep(-0.02, 0.22, quota_sole));
-		sfondo += (disco * 2.5 + alone) * tinta_sole;
+		sfondo += (disco * 2.5 + alone) * tinta_sole * (1.0 - oscuramento_pioggia * 0.95);
 	}
 
 	// 4. Disco della luna (posizionato all'opposto del Sole)
@@ -110,33 +117,48 @@ void sky() {
 		float alone_luna = pow(max(0.0, cos_angolo_luna), 160.0) * 0.25;
 		vec3 tinta_luna = vec3(0.85, 0.92, 1.0);
 		float fade_luna = smoothstep(0.30, 0.75, oscurita_locale);
-		sfondo += (disco_luna * 1.8 + alone_luna) * tinta_luna * fade_luna;
+		sfondo += (disco_luna * 1.8 + alone_luna) * tinta_luna * fade_luna * (1.0 - oscuramento_pioggia * 0.95);
 	}
 
 	// 5. Nuvole Procedurali Dinamiche
 	if (copertura_nubi > 0.02) {
-		vec2 uv = (EYEDIR.xz / max(EYEDIR.y + 0.16, 0.07)) * (0.35 * scala_nubi);
+		// UV proiettate a cupola con allungamento stratiforme
+		vec2 uv = (EYEDIR.xz / max(EYEDIR.y + 0.12, 0.05)) * (0.28 * scala_nubi);
 		vec2 moto = velocita_vento * TIME;
 
+		// Rumore a strati con turbolenza
 		float nubi_macro = fbm(uv + moto);
-		float nubi_micro = fbm(uv * 2.4 - moto * 1.3) * densita_dettaglio;
-		float rumore_totale = nubi_macro + nubi_micro;
+		float nubi_micro = fbm(uv * 2.5 - moto * 1.5) * densita_dettaglio;
+		float rumore_totale = mix(nubi_macro, nubi_micro, 0.35);
 
-		// Soglia dinamica determinata dal meteo estratto
-		float soglia_min = mix(0.75, 0.25, copertura_nubi);
-		float soglia_max = soglia_min + mix(0.40, 0.15, copertura_nubi);
+		// Soglie calibrate per mantenere il rilievo delle masse nuvolose
+		float soglia_min = mix(0.48, 0.12, copertura_nubi);
+		float soglia_max = mix(0.85, 0.55, copertura_nubi);
 		float densita = smoothstep(soglia_min, soglia_max, rumore_totale);
 
-		// Colori nubi: bianche/chiare di giorno, cariche di pioggia o arancio al tramonto
-		vec3 col_nube_giorno = mix(vec3(0.95, 0.96, 0.98), vec3(0.35, 0.37, 0.40), oscuramento_pioggia);
-		vec3 col_ombra_giorno = mix(vec3(0.40, 0.45, 0.52), vec3(0.18, 0.20, 0.24), oscuramento_pioggia);
+		// Tavolozza temporale: base blu piombo / carbone scuor, creste grigio perla / cielo chiaro
+		vec3 temp_luce = vec3(0.55, 0.60, 0.68);
+		vec3 temp_ombra = vec3(0.08, 0.10, 0.14);
 
-		vec3 nube_base = mix(vec3(0.03, 0.04, 0.06), col_nube_giorno, giorno_puro);
-		vec3 nube_ombra = mix(vec3(0.01, 0.015, 0.02), col_ombra_giorno, giorno_puro);
-		nube_base = mix(nube_base, vec3(0.96, 0.42, 0.12), crepuscolo * verso_sole * (1.0 - oscuramento_pioggia * 0.7));
+		// Toni stratiformi realistici: pancia scura (fumo) e creste grigio perla / bluastro
+		vec3 col_nube_giorno = mix(vec3(0.95, 0.96, 0.98), temp_luce, oscuramento_pioggia);
+		vec3 col_ombra_giorno = mix(vec3(0.40, 0.45, 0.52), temp_ombra, oscuramento_pioggia);
 
-		vec3 colore_nube = mix(nube_ombra, nube_base, smoothstep(soglia_min, soglia_max + 0.1, rumore_totale));
-		float maschera_orizzonte = smoothstep(0.01, 0.14, EYEDIR.y);
+		vec3 nube_base = mix(vec3(0.02, 0.025, 0.035), col_nube_giorno, giorno_puro);
+		vec3 nube_ombra = mix(vec3(0.005, 0.008, 0.012), col_ombra_giorno, giorno_puro);
+		nube_base = mix(nube_base, vec3(0.96, 0.42, 0.12), crepuscolo * verso_sole * (1.0 - oscuramento_pioggia));
+
+		// Bagliore intra-nube del fulmine: accende la pancia della nube
+		vec3 tinta_lampo = vec3(0.90, 0.94, 1.0) * intensita_lampo * 2.6;
+		nube_base += tinta_lampo;
+		nube_ombra += tinta_lampo * 0.75;
+
+		// Contrasto marcato per evidenziare i volumi delle nubi
+		float contrasto_volume = smoothstep(soglia_min, soglia_max, rumore_totale);
+		vec3 colore_nube = mix(nube_ombra, nube_base, pow(contrasto_volume, 1.8));
+
+		float maschera_orizzonte = smoothstep(0.0, 0.12, EYEDIR.y);
+		float copertura_finale = clamp(densita * (0.85 + oscuramento_pioggia * 0.15), 0.0,  1.0);
 
 		COLOR = mix(sfondo, colore_nube, densita * maschera_orizzonte);
 	} else {
