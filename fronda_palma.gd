@@ -1,7 +1,7 @@
 class_name FrondaPalma
 extends RefCounted
 
-static func costruisci(lungh: float = 3.2, arco: float = 1.1, rng: RandomNumberGenerator = null) -> ArrayMesh:
+static func costruisci(lungh: float = 4.2, arco: float = 0.65, rng: RandomNumberGenerator = null) -> ArrayMesh:
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
@@ -13,13 +13,13 @@ static func costruisci(lungh: float = 3.2, arco: float = 1.1, rng: RandomNumberG
 	mat.shader = load("res://foglia_palma.gdshader")
 
 	# 1. Asse centrale (Rachide legnosa)
-	var passi = 64
+	var passi = 80
 	var spine: Array[Vector3] = []
 	for i in range(passi + 1):
 		var t = float(i) / float(passi)
 		var z = t * lungh
-		# Flessione ad arco naturale parabolico
-		var y = sin(t * PI * 0.65) * 0.3 - pow(t, 2.0) * arco
+		# Parabola reale con culmine convesso: sale fino a 0.5m prima di flettere
+		var y = sin(t * PI * 0.6) * 0.35 - pow(t, 4.0) * 0.45
 		spine.append(Vector3(0.0, y, z))
 
 	# Tinte realistiche: rachide ocra/legno, verde vivo, punta secca marroncina
@@ -50,12 +50,12 @@ static func costruisci(lungh: float = 3.2, arco: float = 1.1, rng: RandomNumberG
 		
 		if i == 0: continue
 
-		# Dimensioni pinna
-		var len_pinna = max(0.04, (1.0 - pow(t, 1.45)) * pow(t, 0.24) * 1.60)
-		var inc_fwd = lerp(0.50, 3.2, pow(t, 1.2))
-		var w_lamina = lerp(0.062, 0.022, t)
-		var sfalso_v = 0.020 if (i % 2 == 0) else -0.015
-		var discesa_v = len_pinna * lerp(0.16, 0.04, t) + sfalso_v
+		# Pinna proporzionata, densa e senza zig-zag eccessivo
+		var len_pinna = max(0.05, (1.0 - pow(t, 1.40)) * pow(t, 0.24) * 1.22)
+		var inc_fwd = lerp(0.85, 3.4, pow(t, 0.80))
+		var w_lamina = lerp(0.075, 0.028, t)
+		var sfalso_v = 0.002 if (i % 2 == 0) else -0.002
+		var discesa_v = len_pinna * lerp(0.10, 0.02, t) + sfalso_v
 		var prof_canale = 0.035
 
 		# COLOR.g = 1.0 indica foglia allo shader
