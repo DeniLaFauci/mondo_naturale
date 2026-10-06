@@ -335,105 +335,139 @@ func calcola_quota_e_normale_terreno(x: float, z: float) -> Dictionary:
 	return {"quota": h_centro, "normale": normale}
 
 func crea_mesh_palma() -> Mesh:
-	var st = SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
 	# Materiale tronco palma
 	var mat_tronco = StandardMaterial3D.new()
-	mat_tronco.albedo_color = Color(0.42, 0.30, 0.18)
-	mat_tronco.roughness = 0.9
+	mat_tronco.albedo_color = Color(0.38, 0.28, 0.18)
+	mat_tronco.roughness = 0.95
 
-	# Fusto cilindrico rastremato
-	var st_tronco = SurfaceTool.new()
-	st_tronco.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var r_base = 0.28
-	var r_apice = 0.16
-	var h_fusto = 4.8
-	var spicchi = 6
-
-	for i in range(spicchi):
-		var a1 = float(i) / float(spicchi) * TAU
-		var a2 = float(i + 1) / float(spicchi) * TAU
-		var v1 = Vector3(cos(a1) * r_base, 0.0, sin(a1) * r_base)
-		var v2 = Vector3(cos(a2) * r_base, 0.0, sin(a2) * r_base)
-		var v3 = Vector3(cos(a2) * r_apice + 0.4, h_fusto, sin(a2) * r_apice)
-		var v4 = Vector3(cos(a1) * r_apice + 0.4, h_fusto, sin(a1) * r_apice)
-
-		st_tronco.add_vertex(v1); st_tronco.add_vertex(v2); st_tronco.add_vertex(v3)
-		st_tronco.add_vertex(v1); st_tronco.add_vertex(v3); st_tronco.add_vertex(v4)	
-	st_tronco.generate_normals()
-	var mesh_tot = st_tronco.commit()
-
-	# Chioma a foglie larghe ricurve
-	var st_foglie = SurfaceTool.new()
-	st_foglie.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var mat_foglie = StandardMaterial3D.new()
-	mat_foglie.albedo_color = Color(0.18, 0.45, 0.12)
+	mat_foglie.albedo_color = Color(0.16, 0.42, 0.08)
+	mat_foglie.roughness = 0.65
 	mat_foglie.cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	var num_rami = 7
-	var centro_apice = Vector3(0.4, h_fusto, 0.0)
-	for i in range(num_rami): 
-		var ang = float(i) / float(num_rami) * TAU
-		var dir_ramo = Vector3(cos(ang), 0.0, sin(ang))
-		var p_punta = centro_apice + dir_ramo * 2.8 + Vector3(0.0, -1.1, 0.0)
-		var p_lato1 = centro_apice + dir_ramo * 1.4 + Vector3(-dir_ramo.z, 0.3, dir_ramo.x) * 0.7
-		var p_lato2 = centro_apice + dir_ramo * 1.4 + Vector3(dir_ramo.z, 0.3, -dir_ramo.x) * 0.7
-
-		st_foglie.add_vertex(centro_apice); st_foglie.add_vertex(p_lato1); st_foglie.add_vertex(p_punta)
-		st_foglie.add_vertex(centro_apice); st_foglie.add_vertex(p_punta); st_foglie.add_vertex(p_lato2)
-
-	st_foglie.generate_normals()
-	mesh_tot = st_foglie.commit(mesh_tot)
-	mesh_tot.surface_set_material(0, mat_tronco)
-	mesh_tot.surface_set_material(1, mat_foglie)
-	return mesh_tot
-
-func crea_mesh_pino() -> Mesh:
-	var mat_tronco = StandardMaterial3D.new()
-	mat_tronco.albedo_color = Color(0.28, 0.18, 0.12)
-
+	# Fusto curvo e segmentato (stile spiaggia tropicale)
 	var st_tronco = SurfaceTool.new()
 	st_tronco.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var r = 0.22
-	var h = 3.0
+
+	var num_nodi = 7
+	var anelli: Array[Array] = []
+	var raggio_tronco = 0.14
+	var inclinazione_totale = 1.1
+
+	for n in range(num_nodi + 1):
+		var t = float(n) / float(num_nodi)
+		var h = t * 4.6
+		var curva = pow(t, 1.6) * inclinazione_totale
+		var centro = Vector3(curva, h, 0.0)
+		var r_anello = raggio_tronco * (1.0 - t * 0.4)
+
+		var punti_anello: Array[Vector3] = []
+		for i in range(6):
+			var a = float(i) / 6.0 * TAU		
+			punti_anello.append(centro + Vector3(cos(a) * r_anello, 0.0, sin(a) * r_anello))
+		anelli.append(punti_anello)
+
+	for n in range(num_nodi):
+		var a_inf = anelli[n]
+		var a_sup = anelli[n + 1]
+		for i in range(6):
+			var i_next = (i + 1) % 6
+			st_tronco.add_vertex(a_inf[i]); st_tronco.add_vertex(a_inf[i_next]); st_tronco.add_vertex(a_sup[i_next])
+			st_tronco.add_vertex(a_inf[i]); st_tronco.add_vertex(a_sup[i_next]); st_tronco.add_vertex(a_sup[i])
+
+	st_tronco.generate_normals()
+	var mesh = st_tronco.commit()
+
+	# Chioma a foglie arcuate e spioventi
+	var st_foglie = SurfaceTool.new()
+	st_foglie.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var vertice_cima = Vector3(inclinazione_totale, 4.6, 0.0)
+	var num_fronde = 12
+
+	for f in range(num_fronde): 
+		var rot_ang = float(f) / float(num_fronde) * TAU
+		var dir_radiale = Vector3(cos(rot_ang), 0.0, sin(rot_ang))
+
+		var p_origine = vertice_cima
+		var p_arco = vertice_cima + dir_radiale * 1.5 + Vector3(0.0, 0.35, 0.0)
+		var p_punta = vertice_cima + dir_radiale * 3.1 - Vector3(0.0, 1.25, 0.0)
+
+		var orto = Vector3(-dir_radiale.z, 0.0, dir_radiale.x) * 0.45
+		var p_lato1 = p_arco + orto
+		var p_lato2 = p_arco - orto
+
+		st_foglie.add_vertex(p_origine); st_foglie.add_vertex(p_lato1); st_foglie.add_vertex(p_punta)
+		st_foglie.add_vertex(p_origine); st_foglie.add_vertex(p_punta); st_foglie.add_vertex(p_lato2)
+
+	st_foglie.generate_normals()
+	mesh = st_foglie.commit(mesh)
+	mesh.surface_set_material(0, mat_tronco)
+	mesh.surface_set_material(1, mat_foglie)
+	return mesh
+
+func crea_mesh_pino() -> ArrayMesh:
+	var mat_legno = StandardMaterial3D.new()
+	mat_legno.albedo_color = Color(0.24, 0.16, 0.10)
+	mat_legno.roughness = 0.95
+
+	var mat_aghi = StandardMaterial3D.new()
+	mat_aghi.albedo_color = Color(0.09, 0.22, 0.11)
+	mat_aghi.roughness = 0.85
+	mat_aghi.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	# 1. Fusto sottile ed eretto
+	var st_fusto = SurfaceTool.new()
+	st_fusto.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var r_base = 0.12
+	var r_cima = 0.04
+	var h_tot = 3.6
 
 	for i in range(5):
 		var ang1 = float(i) / 5.0 * TAU
 		var ang2 = float(i + 1) / 5.0 * TAU
-		var v1 = Vector3(cos(ang1) * r, 0.0, sin(ang1) * r)
-		var v2 = Vector3(cos(ang2) * r, 0.0, sin(ang2) * r)
-		var v3 = Vector3(cos(ang2) * r * 0.6, h, sin(ang2) * r * 0.6)
-		var v4 = Vector3(cos(ang1) * r * 0.6, h, sin(ang1) * r * 0.6)
-		st_tronco.add_vertex(v1); st_tronco.add_vertex(v2); st_tronco.add_vertex(v3)
-		st_tronco.add_vertex(v1); st_tronco.add_vertex(v3); st_tronco.add_vertex(v4)
-	st_tronco.generate_normals()
-	var mesh_tot = st_tronco.commit()
+		var v1 = Vector3(cos(ang1) * r_base, 0.0, sin(ang1) * r_base)
+		var v2 = Vector3(cos(ang2) * r_base, 0.0, sin(ang2) * r_base)
+		var v3 = Vector3(cos(ang2) * r_cima, h_tot, sin(ang2) * r_cima)
+		var v4 = Vector3(cos(ang1) * r_cima, h_tot, sin(ang1) * r_cima)
 
+		st_fusto.add_vertex(v1); st_fusto.add_vertex(v2); st_fusto.add_vertex(v3)
+		st_fusto.add_vertex(v1); st_fusto.add_vertex(v3); st_fusto.add_vertex(v4)
+
+	st_fusto.generate_normals()
+	var mesh_tot = st_fusto.commit()
+
+	# 2. Palchi d'aghi a stella frastagliati (5 strati con pendenza verso il basso)
 	var st_chioma = SurfaceTool.new()
 	st_chioma.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var mat_chioma = StandardMaterial3D.new()
 
-	var strati = [
-		{base_y = 2.0, h = 2.4, r = 1.6},
-		{base_y = 3.6, h = 2.2, r = 1.25},
-		{base_y = 5.0, h = 2.0, r = 0.85}
+	var piani = [
+		{y = 0.7, r_ext = 1.35, r_int = 0.55, h_punta = 1.4},
+		{y = 1.3, r_ext = 1.15, r_int = 0.45, h_punta = 1.3},
+		{y = 1.9, r_ext = 0.90, r_int = 0.35, h_punta = 1.2},
+		{y = 2.5, r_ext = 0.65, r_int = 0.25, h_punta = 1.0},
+		{y = 3.1, r_ext = 0.40, r_int = 0.15, h_punta = 0.8}
 	]
 
-	for s in strati:
-		var punta = Vector3(0.0, s.base_y + s.h, 0.0)
-		for i in range(6):
-			var a1 = float(i) / 6.0 * TAU
-			var a2 = float(i + 1) / 6.0 * TAU
-			var b1 = Vector3(cos(a1) * s.r, s.base_y, sin(a1) * s.r)
-			var b2 = Vector3(cos(a2) * s.r, s.base_y, sin(a2) * s.r)
-			st_chioma.add_vertex(b1); st_chioma.add_vertex(b2); st_chioma.add_vertex(punta)
+	for p in piani:
+		var apice = Vector3(0.0, p.y + p.h_punta, 0.0)
+		var n_spicchi = 8
+		for i in range(n_spicchi):
+			var a1 = float(i) / float(n_spicchi) * TAU
+			var a_mid = (float(i) + 0.5) / float(n_spicchi) * TAU
+			var a2 = float(i + 1) / float(n_spicchi) * TAU
+
+			var punta_ramo = Vector3(cos(a_mid) * p.r_ext, p.y, sin(a_mid) * p.r_ext)
+			var rientro1 = Vector3(cos(a1) * p.r_int, p.y + 0.15, sin(a1) * p.r_int)
+			var rientro2 = Vector3(cos(a2) * p.r_int, p.y + 0.15, sin(a2) * p.r_int)
+
+			st_chioma.add_vertex(apice); st_chioma.add_vertex(rientro1); st_chioma.add_vertex(punta_ramo)
+			st_chioma.add_vertex(apice); st_chioma.add_vertex(punta_ramo); st_chioma.add_vertex(rientro2)
 
 	st_chioma.generate_normals()
-	mesh_tot = st_chioma.commit(mesh_tot)
-	mesh_tot.surface_set_material(0, mat_tronco)
-	mesh_tot.surface_set_material(1, mat_chioma)
-	return mesh_tot
+	var mesh = st_chioma.commit(mesh_tot)
+	mesh.surface_set_material(0, mat_legno)
+	mesh.surface_set_material(1, mat_aghi)
+	return mesh
 
 func crea_vegetazione() -> void:
 	var mesh_palma = crea_mesh_palma()
@@ -444,42 +478,42 @@ func crea_vegetazione() -> void:
 
 	var raggio_isola = 118.0
 	var quota_mare_rif = 1.2
+	var passo = 3.2
 
 	# Campionamento a griglia con perturbazione casuale
-	var passo = 4.2
 	for x in range (int(-raggio_isola), int(raggio_isola), int(passo)):
 		for z in range(int(-raggio_isola), int(raggio_isola), int(passo)):
-			var px = float(x) + randf_range(-1.4, 1.4)
-			var pz = float(z) + randf_range(-1.4, 1.4)
+			var px = float(x) + randf_range(-1.2, 1.2)
+			var pz = float(z) + randf_range(-1.2, 1.2)
 			if Vector2(px, pz).length() > raggio_isola: continue
 
 			var info = calcola_quota_e_normale_terreno(px, pz)
 			var h = info["quota"]
 			var norm = info["normale"]
-			var pendenza = norm.y # 1.0 = perfettamente piano, < 0.65 = ripido
+			var pendenza = norm.y
 
 			# 1. PALME: solo nella fascia costiera / spiaggia (sopra il mare e sotto quota 7.0)
-			if h > quota_mare_rif + 0.3 and h < quota_mare_rif + 5.5 and pendenza > 0.75:
-				if randf() < 0.35: # Densità palme
+			if h > quota_mare_rif + 0.2 and h < quota_mare_rif + 5.2 and pendenza > 0.72:
+				if randf() < 0.24: # Densità palme
 					var t = Transform3D()
-					var scala = randf_range(0.85, 1.3)
-					t = t.scaled(Vector3(scala, scala, scala))
-					t = t.rotated(Vector3.UP, randf_range(0.0, TAU))
+					var sc = randf_range(0.55, 0.85)
+					t = t.scaled(Vector3(sc, sc, sc))
+					# Inclinazione naturale verso il mare aperto
+					var angolo_costa = atan2(pz, px)
+					t = t.rotated(Vector3.UP, -angolo_costa + randf_range(-0.4, 0.4))
 					# Leggera inclinazione verso l'esterno dell'isola
-					var dir_costa = Vector3(px, 0.0, pz).normalized()
-					t = t.rotated(Vector3(dir_costa.z, 0.0, -dir_costa.x), randf_range(0.08, 0.22))
-					t.origin = Vector3(px, h - 0.15, pz)
+					t.origin = Vector3(px, h - 0.1, pz)
 					transforms_palme.append(t)
 
 			# 2. PINI: sulle zone collinari / erbose e sui pendii intermedi (quota 7.0 - 45.0, pendenza moderata)
-			elif h >= quota_mare_rif + 5.5 and h < 46.0 and pendenza > 0.62 and pendenza < 0.94:
-				if randf() < 0.28: # Densità pini
+			elif h >= quota_mare_rif + 5.2 and h < 48.0 and pendenza > 0.58 and pendenza < 0.94:
+				if randf() < 0.32: # Densità pini
 					var t = Transform3D()
-					var scala = randf_range(0.9, 1.45)
-					t = t.scaled(Vector3(scala, scala, scala))
+					var sc = randf_range(0.45, 0.80)
+					t = t.scaled(Vector3(sc, sc, sc))
 					t = t.rotated(Vector3.UP, randf_range(0.0, TAU))
 					# Il pino cresce verticale rispetto al mondo, ancorandosi sul pendio
-					t.origin = Vector3(px, h - 0.2, pz)
+					t.origin = Vector3(px, h - 0.15, pz)
 					transforms_pini.append(t)
 
 	# Assegna al MultiMesh delle Palme
