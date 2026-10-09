@@ -24,9 +24,9 @@ func _ready() -> void:
 
 	# Telecamera posizionata per inquadrare tutta la palma
 	var cam = Camera3D.new()
-	cam.position = Vector3(0.0, 5.0, 12.0)
+	cam.position = Vector3(0.0, 5.0, 14.5)
 	add_child(cam)
-	cam.look_at(Vector3(0.0, 4.0, 0.0), Vector3.UP)
+	cam.look_at(Vector3(0.0, 4.5, 0.0), Vector3.UP)
 
 	# 3. Perno rotante
 	perno = Node3D.new()
@@ -35,7 +35,7 @@ func _ready() -> void:
 	var rng = RandomNumberGenerator.new()
 	rng.randomize()
 
-	var dati_tronco = TroncoPalma.costruisci(5.5, rng)
+	var dati_tronco = TroncoPalma.costruisci(6.8, rng)
 	var inst_tronco = MeshInstance3D.new()
 	inst_tronco.mesh = dati_tronco.mesh
 	perno.add_child(inst_tronco)
@@ -54,26 +54,26 @@ func _ready() -> void:
 
 func costruisci_chioma(rng: RandomNumberGenerator) -> Node3D:
 	var nodo = Node3D.new()
-	var num_fronde = 72
+	var num_fronde = 120
 	var angolo_aureo = 2.39996323
 
 	for idx in range(num_fronde):
 		var t = float(idx) / float(num_fronde - 1)
-		var lungh = lerp(3.2, 5.0, pow(t, 0.45))
-		var arco = lerp(0.8, 2.0, pow(t, 0.65))
+		var lungh = lerp(4.5, 6.2, pow(t, 0.5))
+		var arco = lerp(1.6, 4.2, pow(t, 0.55))
 		var fronda_mesh = FrondaPalma.costruisci(lungh, arco, rng)
 		var inst = MeshInstance3D.new()
 		inst.mesh = fronda_mesh
 
 		var azimut = idx * angolo_aureo
-		var elevaz = lerp(deg_to_rad(8.0), deg_to_rad(-82.0), pow(t, 0.65))
-		var r_calotta = lerp(0.06, 0.38, pow(t, 0.7))
+		var elevaz = lerp(deg_to_rad(-25.0), deg_to_rad(65.0), pow(t, 0.65))
+		var r_calotta = lerp(0.12, 0.65, pow(t, 0.60))
 
-		var pos_innesto = Vector3(cos(azimut) * r_calotta, -pow(t, 1.2) * 0.28, sin(azimut) * r_calotta)
+		var pos_innesto = Vector3(cos(azimut) * r_calotta, -pow(t, 1.2) * 0.45, sin(azimut) * r_calotta)
 		inst.position = pos_innesto
 		inst.rotation.y = -azimut + PI * 0.5
-		inst.rotation.x = elevaz
-		var rollio_z = sin(idx * 2.3) * deg_to_rad(lerp(2.0, 11.0, t))
+		inst.rotation.x = -elevaz
+		var rollio_z = sin(idx * 2.3) * deg_to_rad(lerp(4.0, 18.0, t))
 		inst.rotation.z = rollio_z
 
 		nodo.add_child(inst)

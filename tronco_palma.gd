@@ -1,6 +1,6 @@
 extends RefCounted
 
-static func costruisci(altezza: float = 5.5, rng: RandomNumberGenerator = null) -> Dictionary:
+static func costruisci(altezza: float = 6.8, rng: RandomNumberGenerator = null) -> Dictionary:
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
@@ -11,9 +11,9 @@ static func costruisci(altezza: float = 5.5, rng: RandomNumberGenerator = null) 
 	var mat = ShaderMaterial.new()
 	mat.shader = load("res://tronco_palma.gdshader")
 
-	var num_anelli = 36
+	var num_anelli = 44
 	var spicchi = 14
-	var raggio_tronco = 0.48
+	var raggio_tronco = 0.18
 
 	# Curvatura organica dolcissima del fusto
 	var dir_curva = rng.randf_range(0.0, TAU)
@@ -30,10 +30,10 @@ static func costruisci(altezza: float = 5.5, rng: RandomNumberGenerator = null) 
 		nodi_asse.append(Vector3(deviazione.x, y, deviazione.z))
 
 		# Profilo: colonna salda che si allarga a campana dolce negli ultimi 15%
-		var r = raggio_tronco * (1.0 - t * 0.08)
-		if t > 0.72:
-			var u_colletto = (t - 0.72) / 0.28
-			r += pow(u_colletto, 1.4) * 0.08 # Raccordo solido senza palla a fungo
+		var r = raggio_tronco * (1.0 - t * 0.14)
+		if t > 0.75:
+			var u_colletto = (t - 0.75) / 0.25
+			r += pow(u_colletto, 1.5) * 0.08 # Raccordo solido senza palla a fungo
 		raggi_medi.append(r)
 
 	# 2. Generazione tessellatura a losanghe/diamanti sfalsati
