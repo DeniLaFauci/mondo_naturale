@@ -4,6 +4,17 @@ const TroncoPalma = preload("res://tronco_palma.gd")
 const FrondaPalma = preload("res://fronda_palma.gd")
 
 var perno: Node3D
+var nodo_chioma: Node3D
+var inst_tronco: MeshInstance3D
+var mat_foglia: ShaderMaterial
+
+var pos_apice_base: Vector3
+var rot_apice_base: Basis
+
+var tempo_ciclo: float = 0.0
+const PERIODO_RAFFICA: float = 8.0
+const GAMMA: float = 1.3
+const OMEGA: float = 4.2
 
 func _ready() -> void:
 	# Luce solare
@@ -35,22 +46,25 @@ func _ready() -> void:
 	var rng = RandomNumberGenerator.new()
 	rng.randomize()
 
-	var dati_tronco = TroncoPalma.costruisci(6.8, rng)
+	var dati_tronco = TroncoPalma.costruisci(5.0, rng)
 	var inst_tronco = MeshInstance3D.new()
 	inst_tronco.mesh = dati_tronco.mesh
 	perno.add_child(inst_tronco)
 
-	# Innesco della chioma sull'apice inclinato del fusto
-	var chioma = costruisci_chioma(rng)
-	chioma.position = dati_tronco.apice
+	# Innesco e salvataggio riferimenti per animazione sincrona
+	var nodo_chioma = costruisci_chioma(rng)
+	pos_apice_base = dati_tronco.apice
+	nodo_chioma.position = pos_apice_base
 
 	var up_fusto = dati_tronco.tangente
 	if abs(up_fusto.dot(Vector3.UP)) < 0.999:
 		var asse_rot = Vector3.UP.cross(up_fusto).normalized()
 		var angolo_rot = Vector3.UP.angle_to(up_fusto)
-		chioma.transform.basis = Basis(asse_rot, angolo_rot)
-
-	perno.add_child(chioma)
+		rot_apice_base = Basis(asse_rot, angolo_rot)
+	else:
+		rot_apice_base = Basis.IDENTITY
+	nodo_chioma.transform.basis = rot_apice_base
+	perno.add_child(nodo_chioma)
 
 func costruisci_chioma(rng: RandomNumberGenerator) -> Node3D:
 	var nodo = Node3D.new()
@@ -62,6 +76,8 @@ func costruisci_chioma(rng: RandomNumberGenerator) -> Node3D:
 		var lungh = lerp(4.5, 6.2, pow(t, 0.5))
 		var arco = lerp(1.6, 4.2, pow(t, 0.55))
 		var fronda_mesh = FrondaPalma.costruisci(lungh, arco, rng)
+		if mat_foglia == null:
+			mat_foglia = fronda_mesh.surface_get_material(0) as ShaderMaterial
 		var inst = MeshInstance3D.new()
 		inst.mesh = fronda_mesh
 
@@ -79,6 +95,33 @@ func costruisci_chioma(rng: RandomNumberGenerator) -> Node3D:
 		nodo.add_child(inst)
 
 	return nodo
+
 func _process(delta: float) -> void:
-	if perno:
-		perno.rotate_y(0.35 * delta)
+	tempo_ciclo += delta
+	var t_raffica = fmod(tempo_ciclo, PERIODO_RAFFICA)
+
+	# Equazione transitorio sottosmorzato
+	var ampiezza_iniziale = 0.42
+	var flessione_rlc = 0.0
+	if t_raffica < 5.0:
+		flessione_rlc = ampiezza_iniziale * exp(-GAMMA * t_raffica) * sin(OMEGA * t_raffica)
+
+	# Vettore di piega lungo l'asse del vento (direzione X/Z)
+	var dir_x = 1.0
+	var dir_z = 0.35
+	var asse_piega = Vector3(-dir_z, 0.0, dir_x).normalized()
+
+	# Flessione coerente dell'intera struttura
+	if inst_tronco:
+		inst_tronco.rotation = asse_piega * flessione_rlc
+
+	if nodo_chioma:
+		# L'apice ruota e si sposta rigidamente solidale con il tronco
+		var rot_istantanea = Basis(asse_piega, flessione_rlc)
+		nodo_chioma.position = rot_istantanea * pos_apice_base
+		nodo_chioma.transform.basis = rot_istantanea * rot_apice_base
+
+	# Regolazione vibrazione foglie proporzionale all'energia cinetica istantanea
+	if mat_foglia:
+		var energia_foglie = clamp(abs(flessione_rlc) * 4.0 + 0.25, 0.2,2.4)
+		mat_foglia.set_shader_parameter("forza_vento", energia_foglie)

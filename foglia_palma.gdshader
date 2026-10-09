@@ -1,12 +1,43 @@
 shader_type spatial;
 render_mode cull_disabled;
 
+// Parametri Vento
+uniform float forza_vento : hint_range(0.0, 3.0) = 0.8;
+uniform vec2 dir_vento = vec2(1.0, 0.4);
+uniform vec3 col_foglia_base : source_color = vec3(0.18, 0.38, 0.12);
+
 uniform vec3 col_verde_base : source_color = vec3(0.16, 0.38, 0.07);
 uniform vec3 col_verde_scuro : source_color = vec3(0.08, 0.22, 0.04);
 uniform vec3 col_rachide : source_color = vec3(0.42, 0.32, 0.15);
 uniform vec3 col_secco : source_color = vec3(0.55, 0.42, 0.16);
 uniform vec3 col_trasluscenza : source_color = vec3(0.35, 0.55, 0.10);
 uniform float densita_pinne : hint_range(40.0, 160.0) = 85.0;
+
+void vertex() {
+	// Calcolo coordinate nel mondo per sincronizzare le onde del vento tra tutte le fronde
+	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec2 dir = normalize(dir_vento);
+
+	// Fronte d'onda del vento nello spazio 3D
+	float onda = dot(world_pos.xz, dir) * 0.4 - TIME * (1.8 + forza_vento * 1.2);
+
+	// Flessione principale della fronda: nulla all'attacco (UV.y = 0), massima all'apice (UV.y = 1)
+	float peso_lunghezza = pow(UV.y, 1.8);
+	float oscillazione_principale = sin(onda) * 0.18 * forza_vento * peso_lunghezza;
+
+	// Vibrazione/fruscio rapido delle punte e delle singole follaiole
+	float fruscio = sin(onda * 3.5 + world_pos.y * 2.0) * 0.05 * forza_vento * pow(UV.y, 2.5);
+
+	// Spostamento nel mondo (piega orizzontale lunga la direzione + piccolo cedimento verticale)
+	vec3 spostamento_mondo = vec3(
+		dir.x * (oscillazione_principale + fruscio),
+		-abs(oscillazione_principale) * 0.4,
+		dir.y * (oscillazione_principale + fruscio)
+	);
+
+	// Conversione dello scostamento nello spazio locale del vertice
+	VERTEX += (inverse(MODEL_MATRIX) * vec4(spostamento_mondo, 0.0)).xyz;
+}
 
 void fragment() {
 	if (COLOR.g < 0.5) {

@@ -1,6 +1,10 @@
 shader_type spatial;
 render_mode cull_disabled;
 
+// Parametri Vento Tronco
+uniform float forza_vento : hint_range(0.0, 3.0) = 0.8;
+uniform vec2 dir_vento = vec2(1.0, 0.4);
+
 uniform vec3 col_corteccia_grigia : source_color = vec3(0.62, 0.56, 0.46);
 uniform vec3 col_corteccia_bruna : source_color = vec3(0.44, 0.36, 0.28);
 uniform vec3 col_solco_profondo : source_color = vec3(0.16, 0.11, 0.07);
@@ -19,6 +23,10 @@ float rumore_corteccia(vec2 uv) {
 	float c = hash(i + vec2(0.0, 1.0));
 	float d = hash(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void vertex() {
+	// Il tronco mantiene la coerenza geometrica con la chioma
 }
 
 void fragment() {
