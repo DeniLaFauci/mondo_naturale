@@ -1,4 +1,4 @@
-class_name GeneratorePalma
+class_name AlberoPalma
 extends RefCounted
 
 # Costruisce proceduralmente una palma fotorealisticamente dettagliata.
